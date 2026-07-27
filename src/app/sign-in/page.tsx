@@ -2,6 +2,13 @@ import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/env";
 import { SignInForm } from "@/components/sign-in-form";
 
+// Whether Supabase is configured can change between deployments/environments
+// without any code change, and Next's build cache doesn't treat env vars as
+// a cache key for unchanged pages — without this, a redeploy that only adds
+// env vars can keep serving a stale prerendered "demo mode" page. See
+// src/app/(app)/layout.tsx for the same issue on the authenticated routes.
+export const dynamic = "force-dynamic";
+
 export default function SignInPage() {
   const configured = isSupabaseConfigured();
 
