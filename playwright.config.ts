@@ -34,5 +34,13 @@ export default defineConfig({
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
+    // This suite exercises the demo-mode golden path specifically. Force
+    // demo mode regardless of a developer's local .env.local — these
+    // explicit empty values win over .env.local in Next.js's env
+    // precedence, so the suite behaves the same on every machine and in CI.
+    env: {
+      NEXT_PUBLIC_SUPABASE_URL: "",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "",
+    },
   },
 });
