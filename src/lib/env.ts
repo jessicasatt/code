@@ -29,6 +29,11 @@ export type PublicEnv = z.infer<typeof publicEnvSchema>;
 let cachedServerEnv: ServerEnv | null = null;
 let cachedPublicEnv: PublicEnv | null = null;
 
+/** An env var set to an empty string ("") means "unset" here, same as omitting it entirely — some platforms (and our own e2e config) set unused vars to "" rather than leaving them undefined. */
+function envOrUndefined(value: string | undefined): string | undefined {
+  return value && value.trim().length > 0 ? value : undefined;
+}
+
 function parseOrThrow<T>(schema: z.ZodType<T>, source: Record<string, string | undefined>, label: string): T {
   const result = schema.safeParse(source);
   if (!result.success) {
@@ -46,14 +51,14 @@ export function getServerEnv(): ServerEnv {
     cachedServerEnv = parseOrThrow(
       serverEnvSchema,
       {
-        SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
-        HIGHLEVEL_PRIVATE_INTEGRATION_TOKEN: process.env.HIGHLEVEL_PRIVATE_INTEGRATION_TOKEN,
-        HIGHLEVEL_LOCATION_ID: process.env.HIGHLEVEL_LOCATION_ID,
-        HIGHLEVEL_WEBHOOK_SHARED_SECRET: process.env.HIGHLEVEL_WEBHOOK_SHARED_SECRET,
-        VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,
-        VAPID_SUBJECT: process.env.VAPID_SUBJECT,
-        OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-        CRON_SECRET: process.env.CRON_SECRET,
+        SUPABASE_SERVICE_ROLE_KEY: envOrUndefined(process.env.SUPABASE_SERVICE_ROLE_KEY),
+        HIGHLEVEL_PRIVATE_INTEGRATION_TOKEN: envOrUndefined(process.env.HIGHLEVEL_PRIVATE_INTEGRATION_TOKEN),
+        HIGHLEVEL_LOCATION_ID: envOrUndefined(process.env.HIGHLEVEL_LOCATION_ID),
+        HIGHLEVEL_WEBHOOK_SHARED_SECRET: envOrUndefined(process.env.HIGHLEVEL_WEBHOOK_SHARED_SECRET),
+        VAPID_PRIVATE_KEY: envOrUndefined(process.env.VAPID_PRIVATE_KEY),
+        VAPID_SUBJECT: envOrUndefined(process.env.VAPID_SUBJECT),
+        OPENAI_API_KEY: envOrUndefined(process.env.OPENAI_API_KEY),
+        CRON_SECRET: envOrUndefined(process.env.CRON_SECRET),
       },
       "server",
     );
@@ -66,10 +71,10 @@ export function getPublicEnv(): PublicEnv {
     cachedPublicEnv = parseOrThrow(
       publicEnvSchema,
       {
-        NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-        NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-        NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+        NEXT_PUBLIC_SUPABASE_URL: envOrUndefined(process.env.NEXT_PUBLIC_SUPABASE_URL),
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: envOrUndefined(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: envOrUndefined(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY),
+        NEXT_PUBLIC_APP_URL: envOrUndefined(process.env.NEXT_PUBLIC_APP_URL),
       },
       "public",
     );
