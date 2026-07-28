@@ -36,6 +36,10 @@ const CATEGORY_LABELS: Record<NotificationCategory, string> = {
   behind_weekly_pace: "Behind weekly pace",
   end_of_day_summary: "End-of-day summary",
   weekly_review: "Weekly review",
+  late_start: "Haven't started by your desired time",
+  behind_pace: "Behind today's pace",
+  daily_target_complete: "Daily target reached",
+  data_stale: "HighLevel connection issue",
 };
 
 export function SettingsForm({

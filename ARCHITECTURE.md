@@ -200,3 +200,47 @@ entire mountain. Assign the next hill.**
   `src/lib/data/behavioral-metrics.ts`). These describe what happened;
   they never claim why, and a caller is expected to withhold a metric
   until its sample size is meaningful.
+
+## Proactive coaching (PROACTIVE_COACHING_AUDIT.md)
+
+Three layers, deliberately separate so the model (once Phase 4 adds one)
+never has to calculate factual state itself:
+
+- **Behavioral state engine** (`src/lib/domain/behavioral-state.ts`,
+  `determineBehavioralState`): a pure function over recorded facts —
+  schedule, today's calls, the active block, sync status — that returns
+  exactly one state (`outside_work_hours`, `late_start`,
+  `inactive_mid_block`, `behind_pace`, `block_complete`, etc., see the
+  file for the full list) with a severity, a reason, and whether it's
+  worth notifying about right now. Honors a per-user IANA timezone
+  directly via `date-fns-tz`, independent of the app-wide
+  `APP_TIMEZONE` constant elsewhere (`src/lib/data/behavioral-state.ts`
+  gathers the real inputs from Supabase/demo state and calls it).
+- **Intervention engine** (`src/lib/notifications/intervention-engine.ts`,
+  `runInterventionEngine`): turns a behavioral state into at most one
+  notification. Only states with no existing notification path get
+  copy (`src/lib/domain/intervention-copy.ts`) — `block_nearly_complete`
+  and `block_complete` are already covered by the event-driven
+  notifications fired directly from `call-blocks.ts`/`sync.ts`, so the
+  intervention engine skips them entirely rather than double-sending.
+  Enforces the user's daily proactive-notification cap and a per-state
+  cooldown against the `interventions` table (previously unused —
+  every send is now recorded there with its severity/reason/playbook,
+  which is what a future "which interventions actually work" analysis
+  will read from). Copy varies by the user's configured coaching
+  intensity (gentle/standard/direct).
+- **Call sites**: `POST /api/highlevel/sync-now` runs the engine on every
+  on-demand sync (covers `inactive_mid_block` while the Execute screen is
+  open), and the existing hourly `scheduled-notifications` cron runs it
+  unconditionally on every fire — unlike that route's other categories,
+  it isn't gated to a single configured hour, since `late_start`/
+  `behind_pace` need re-checking across the day (this is the "hourly
+  only, no new infrastructure" cadence decision from the audit).
+
+`coaching_settings` (additive table, separate from `profiles`/`goals`)
+holds the tunable knobs — desired first-call time, default block size,
+inactivity threshold, behind-pace tolerance, notification cooldown, daily
+cap, coaching intensity — plus pause controls (30 min / 1 hour / until
+tomorrow / vacation mode, `isCoachingPaused`). A pause short-circuits both
+the state engine (returns `coaching_paused`, never eligible) and the
+sync-now inactivity path.

@@ -60,6 +60,13 @@ export const ALL_NOTIFICATION_CATEGORIES = [
   "behind_weekly_pace",
   "end_of_day_summary",
   "weekly_review",
+  // Proactive coaching (PROACTIVE_COACHING_AUDIT.md Phase 3.5) — driven by
+  // determineBehavioralState via the intervention engine, not by a
+  // schedule or a block event.
+  "late_start",
+  "behind_pace",
+  "daily_target_complete",
+  "data_stale",
 ] as const;
 export type NotificationCategory = (typeof ALL_NOTIFICATION_CATEGORIES)[number];
 

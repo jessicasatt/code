@@ -36,6 +36,15 @@ export function endOfAppDay(utcDate: Date): Date {
   return fromAppTime(endOfDay(toAppTime(utcDate)));
 }
 
+/** Same as startOfAppDay/endOfAppDay, but parameterized by an explicit IANA timezone rather than APP_TIMEZONE — see src/lib/domain/behavioral-state.ts. */
+export function startOfDayInTimezone(utcDate: Date, timezone: string): Date {
+  return fromZonedTime(startOfDay(toZonedTime(utcDate, timezone)), timezone);
+}
+
+export function endOfDayInTimezone(utcDate: Date, timezone: string): Date {
+  return fromZonedTime(endOfDay(toZonedTime(utcDate, timezone)), timezone);
+}
+
 /** Week starts Monday, matching a Mon-Fri/Sat sales workweek. */
 export function startOfAppWeek(utcDate: Date): Date {
   return fromAppTime(startOfWeek(toAppTime(utcDate), { weekStartsOn: 1 }));

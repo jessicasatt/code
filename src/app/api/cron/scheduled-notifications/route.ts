@@ -15,6 +15,7 @@ import {
 } from "@/lib/domain/revenue";
 import { formatCentsAsUsd } from "@/lib/domain/money";
 import { endOfAppDay, remainingWorkdaysInWeek, startOfAppDay, startOfAppWeek, toAppTime } from "@/lib/date/timezone";
+import { runInterventionEngine } from "@/lib/notifications/intervention-engine";
 
 /**
  * Fires hourly (24 entries in vercel.json, each individually within
@@ -149,5 +150,14 @@ export async function GET(request: NextRequest) {
     "/review",
   );
 
-  return NextResponse.json({ ok: true, sent });
+  // Proactive coaching (PROACTIVE_COACHING_AUDIT.md Phase 3.5): unlike the
+  // categories above, this isn't gated to a single configured hour — it's
+  // re-evaluated every time this route fires (hourly) so late_start,
+  // behind_pace, daily_target_complete, and data_stale get re-checked
+  // across the day, not just once. The engine's own cooldown/daily-cap
+  // logic (against the interventions table) is what prevents spam, not
+  // this route's hour-matching.
+  const intervention = await runInterventionEngine(userId, now);
+
+  return NextResponse.json({ ok: true, sent, intervention });
 }
