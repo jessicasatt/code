@@ -2,17 +2,28 @@ import { requireUser } from "@/lib/auth";
 import { getHighLevelProvider } from "@/lib/highlevel";
 import { formatCentsAsUsd } from "@/lib/domain/money";
 import { formatAppTime } from "@/lib/date/timezone";
+import type { Appointment, Contact, Opportunity } from "@/lib/domain/types";
+
+async function settleOrNull<T>(promise: Promise<T>, label: string): Promise<T | null> {
+  try {
+    return await promise;
+  } catch (error) {
+    console.error(`Pipeline: ${label} unavailable`, error);
+    return null;
+  }
+}
 
 export default async function PipelinePage() {
   await requireUser();
   const provider = getHighLevelProvider();
+
   const [opportunities, appointments, contacts] = await Promise.all([
-    provider.getOpportunities(),
-    provider.getAppointments(),
-    provider.getContacts(),
+    settleOrNull<Opportunity[]>(provider.getOpportunities(), "opportunities"),
+    settleOrNull<Appointment[]>(provider.getAppointments(), "appointments"),
+    settleOrNull<Contact[]>(provider.getContacts(), "contacts"),
   ]);
 
-  const contactById = new Map(contacts.map((c) => [c.id, c]));
+  const contactById = new Map((contacts ?? []).map((c) => [c.id, c]));
 
   return (
     <main className="mx-auto flex max-w-lg flex-col gap-6 px-5 py-6">
@@ -24,7 +35,11 @@ export default async function PipelinePage() {
       <section>
         <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-muted">Open opportunities</h2>
         <div className="flex flex-col gap-2">
-          {opportunities.length === 0 ? (
+          {opportunities === null ? (
+            <p className="text-sm text-muted">
+              Not available yet — your HighLevel connection needs the Opportunities permission enabled.
+            </p>
+          ) : opportunities.length === 0 ? (
             <p className="text-sm text-muted">No open opportunities yet.</p>
           ) : (
             opportunities.map((opp) => (
@@ -43,7 +58,9 @@ export default async function PipelinePage() {
       <section>
         <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-muted">Upcoming appointments</h2>
         <div className="flex flex-col gap-2">
-          {appointments.length === 0 ? (
+          {appointments === null ? (
+            <p className="text-sm text-muted">Not available yet.</p>
+          ) : appointments.length === 0 ? (
             <p className="text-sm text-muted">Nothing scheduled.</p>
           ) : (
             appointments.map((appt) => (
@@ -58,6 +75,10 @@ export default async function PipelinePage() {
           )}
         </div>
       </section>
+
+      {contacts === null ? (
+        <p className="text-center text-sm text-danger">Couldn&apos;t load contacts from HighLevel right now.</p>
+      ) : null}
     </main>
   );
 }
