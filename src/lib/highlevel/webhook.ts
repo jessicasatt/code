@@ -51,3 +51,11 @@ export function computeDedupeKey(input: { externalEventId: string | null; rawBod
 export function isDuplicateEvent(dedupeKey: string, seenKeys: ReadonlySet<string>): boolean {
   return seenKeys.has(dedupeKey);
 }
+
+export const WEBHOOK_RATE_LIMIT_WINDOW_SECONDS = 10;
+export const WEBHOOK_RATE_LIMIT_MAX_REQUESTS = 60;
+
+/** Pure decision function; the route handler supplies the actual recent-request count from storage. */
+export function isRateLimited(recentRequestCount: number, max: number = WEBHOOK_RATE_LIMIT_MAX_REQUESTS): boolean {
+  return recentRequestCount >= max;
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeDedupeKey, detectEventType, extractExternalEventId, isDuplicateEvent } from "./webhook";
+import { computeDedupeKey, detectEventType, extractExternalEventId, isDuplicateEvent, isRateLimited } from "./webhook";
 
 describe("detectEventType", () => {
   it("finds the event type under any of the common field names", () => {
@@ -57,5 +57,16 @@ describe("computeDedupeKey / isDuplicateEvent", () => {
     expect(isDuplicateEvent(key, seen)).toBe(false);
     seen.add(key);
     expect(isDuplicateEvent(key, seen)).toBe(true);
+  });
+});
+
+describe("isRateLimited", () => {
+  it("allows requests under the limit", () => {
+    expect(isRateLimited(10, 60)).toBe(false);
+  });
+
+  it("blocks once the count reaches the limit", () => {
+    expect(isRateLimited(60, 60)).toBe(true);
+    expect(isRateLimited(61, 60)).toBe(true);
   });
 });
