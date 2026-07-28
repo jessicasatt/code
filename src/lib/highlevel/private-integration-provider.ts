@@ -48,7 +48,8 @@ export class PrivateIntegrationHighLevelProvider implements HighLevelProvider {
     }
     const response = await fetch(url, { headers: this.authHeaders(), cache: "no-store" });
     if (!response.ok) {
-      throw new Error(`HighLevel ${path} responded ${response.status} ${response.statusText}`);
+      const body = await response.text().catch(() => "");
+      throw new Error(`HighLevel ${path} responded ${response.status} ${response.statusText}: ${body.slice(0, 500)}`);
     }
     return response.json();
   }
