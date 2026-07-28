@@ -25,6 +25,16 @@ describe("mapHighLevelContact", () => {
     });
     expect(contact.contactName).toBe("(831) 331-5518");
   });
+
+  it("normalizes a raw epoch-milliseconds timestamp (as returned by GET /conversations/search) to ISO", () => {
+    const contact = mapHighLevelContact("user-1", {
+      id: "hl-3",
+      contactName: "Frank",
+      tags: [],
+      dateUpdated: 1785186189700,
+    });
+    expect(contact.lastActivityAt).toBe(new Date(1785186189700).toISOString());
+  });
 });
 
 describe("mapHighLevelCallMessage", () => {

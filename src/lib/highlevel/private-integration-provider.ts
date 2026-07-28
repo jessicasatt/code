@@ -1,7 +1,7 @@
 import { getSingleAppUserId } from "../data/single-user";
 import { createAdminSupabaseClient } from "../supabase/admin";
 import type { Appointment, CallEvent, Contact, Opportunity } from "../domain/types";
-import { mapHighLevelCallMessage, mapHighLevelContact } from "./mappers";
+import { coerceToIso, mapHighLevelCallMessage, mapHighLevelContact } from "./mappers";
 import {
   NotYetImplementedError,
   type DateRange,
@@ -112,7 +112,9 @@ export class PrivateIntegrationHighLevelProvider implements HighLevelProvider {
     return messages.filter((m) => {
       if (m.messageType !== "TYPE_CALL") return false;
       if (!range) return true;
-      const t = new Date(String(m.dateAdded)).getTime();
+      const iso = coerceToIso(m.dateAdded);
+      if (!iso) return false;
+      const t = new Date(iso).getTime();
       return t >= range.from.getTime() && t <= range.to.getTime();
     });
   }
@@ -125,7 +127,8 @@ export class PrivateIntegrationHighLevelProvider implements HighLevelProvider {
       // Conversations are returned most-recently-active first; once we're
       // past the requested range there's nothing older worth checking.
       if (range) {
-        const lastActive = new Date(String(conv.lastMessageDate ?? conv.dateUpdated)).getTime();
+        const lastActiveIso = coerceToIso(conv.lastMessageDate ?? conv.dateUpdated);
+        const lastActive = lastActiveIso ? new Date(lastActiveIso).getTime() : 0;
         if (lastActive < range.from.getTime()) break;
       }
       const conversationId = String(conv.id);
@@ -167,7 +170,8 @@ export class PrivateIntegrationHighLevelProvider implements HighLevelProvider {
       const contactIdCache = new Map<string, string>(); // HighLevel contact id -> our contacts.id
 
       for (const conv of conversations) {
-        const lastActive = new Date(String(conv.lastMessageDate ?? conv.dateUpdated)).getTime();
+        const lastActiveIso = coerceToIso(conv.lastMessageDate ?? conv.dateUpdated);
+        const lastActive = lastActiveIso ? new Date(lastActiveIso).getTime() : 0;
         if (lastActive < range.from.getTime()) break;
 
         const hlContactId = conv.contactId ? String(conv.contactId) : null;
