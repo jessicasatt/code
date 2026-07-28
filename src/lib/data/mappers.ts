@@ -1,4 +1,4 @@
-import type { Goal, Profile, WorkBlock } from "../domain/types";
+import type { CoachingSettings, Goal, Profile, WorkBlock } from "../domain/types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function mapProfileRow(row: any): Profile {
@@ -27,6 +27,25 @@ export function mapGoalRow(row: any): Goal {
     averageClientValueCents: row.average_client_value_cents,
     dailyCallTarget: row.daily_call_target,
     weeklyCallTarget: row.weekly_call_target,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function mapCoachingSettingsRow(row: any): CoachingSettings {
+  return {
+    userId: row.user_id,
+    timezone: row.timezone,
+    desiredFirstCallTime: row.desired_first_call_time,
+    defaultBlockSize: row.default_block_size,
+    inactivityThresholdMinutes: row.inactivity_threshold_minutes,
+    behindPaceTolerancePct: row.behind_pace_tolerance_pct,
+    notificationCooldownMinutes: row.notification_cooldown_minutes,
+    maxProactiveNotificationsPerDay: row.max_proactive_notifications_per_day,
+    coachingIntensity: row.coaching_intensity,
+    coachingPausedUntil: row.coaching_paused_until,
+    vacationMode: row.vacation_mode,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

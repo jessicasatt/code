@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { syncActiveWorkBlock } from "@/lib/highlevel/sync";
 import { isInactiveDuringActiveBlock, INACTIVITY_THRESHOLD_MINUTES } from "@/lib/domain/notifications";
 import { notifyInactivityIfEligible } from "@/lib/notifications/triggers";
+import { getCoachingSettings, isCoachingPaused } from "@/lib/data/coaching-settings";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/env";
 
@@ -19,22 +20,26 @@ export async function POST() {
   const result = await syncActiveWorkBlock(user.id);
 
   if (result.synced && result.activeBlockId && isSupabaseConfigured()) {
-    const supabase = await createServerSupabaseClient();
-    const { data: block } = await supabase
-      .from("work_blocks")
-      .select("status, last_activity_at")
-      .eq("id", result.activeBlockId)
-      .maybeSingle();
+    const coachingSettings = await getCoachingSettings(user.id);
 
-    if (block) {
-      const inactive = isInactiveDuringActiveBlock({
-        blockStatus: block.status,
-        lastActivityAt: block.last_activity_at ? new Date(block.last_activity_at) : null,
-        now: new Date(),
-        thresholdMinutes: INACTIVITY_THRESHOLD_MINUTES,
-      });
-      if (inactive) {
-        await notifyInactivityIfEligible(user.id);
+    if (!isCoachingPaused(coachingSettings)) {
+      const supabase = await createServerSupabaseClient();
+      const { data: block } = await supabase
+        .from("work_blocks")
+        .select("status, last_activity_at")
+        .eq("id", result.activeBlockId)
+        .maybeSingle();
+
+      if (block) {
+        const inactive = isInactiveDuringActiveBlock({
+          blockStatus: block.status,
+          lastActivityAt: block.last_activity_at ? new Date(block.last_activity_at) : null,
+          now: new Date(),
+          thresholdMinutes: coachingSettings.inactivityThresholdMinutes ?? INACTIVITY_THRESHOLD_MINUTES,
+        });
+        if (inactive) {
+          await notifyInactivityIfEligible(user.id, new Date(), coachingSettings.notificationCooldownMinutes);
+        }
       }
     }
   }

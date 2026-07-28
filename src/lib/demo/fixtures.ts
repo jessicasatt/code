@@ -2,6 +2,7 @@ import { dollarsToCents } from "../domain/money";
 import type {
   Appointment,
   CallEvent,
+  CoachingSettings,
   Contact,
   FollowUp,
   Goal,
@@ -29,6 +30,24 @@ export function createDemoProfile(now: Date): Profile {
     quietHoursEnd: "07:00",
     workdays: ["monday", "tuesday", "wednesday", "thursday", "friday"],
     onboardingCompletedAt: now.toISOString(),
+    createdAt: now.toISOString(),
+    updatedAt: now.toISOString(),
+  };
+}
+
+export function createDemoCoachingSettings(now: Date): CoachingSettings {
+  return {
+    userId: DEMO_USER_ID,
+    timezone: "America/Los_Angeles",
+    desiredFirstCallTime: "09:00",
+    defaultBlockSize: 10,
+    inactivityThresholdMinutes: 25,
+    behindPaceTolerancePct: 20,
+    notificationCooldownMinutes: 45,
+    maxProactiveNotificationsPerDay: 6,
+    coachingIntensity: "standard",
+    coachingPausedUntil: null,
+    vacationMode: false,
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
   };

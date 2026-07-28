@@ -30,7 +30,11 @@ export async function notifyUser(
  * once-per-45-minutes cooldown (via notification_deliveries) and
  * notifyUser's own category-enabled + quiet-hours checks.
  */
-export async function notifyInactivityIfEligible(userId: string, now: Date = new Date()): Promise<boolean> {
+export async function notifyInactivityIfEligible(
+  userId: string,
+  now: Date = new Date(),
+  cooldownMinutes?: number,
+): Promise<boolean> {
   const supabase = await createServerSupabaseClient();
   const { data: lastNudge } = await supabase
     .from("notification_deliveries")
@@ -45,6 +49,7 @@ export async function notifyInactivityIfEligible(userId: string, now: Date = new
   const cooldownOk = canSendInactivityNudge({
     lastNudgeSentAt: lastNudge?.sent_at ? new Date(lastNudge.sent_at) : null,
     now,
+    cooldownMinutes,
   });
   if (!cooldownOk) return false;
 

@@ -3,6 +3,7 @@ import { isSameAppDay } from "../date/timezone";
 import {
   createDemoAppointments,
   createDemoCallEvents,
+  createDemoCoachingSettings,
   createDemoContacts,
   createDemoFollowUps,
   createDemoGoal,
@@ -18,6 +19,7 @@ import type {
   BehavioralCheckin,
   BehavioralCheckinReason,
   CallEvent,
+  CoachingSettings,
   Contact,
   FollowUp,
   Goal,
@@ -31,6 +33,7 @@ import { ALL_NOTIFICATION_CATEGORIES, type NotificationCategory } from "../domai
 export interface DemoState {
   profile: Profile;
   goal: Goal;
+  coachingSettings: CoachingSettings;
   contacts: Contact[];
   opportunities: Opportunity[];
   appointments: Appointment[];
@@ -53,6 +56,7 @@ function createSeedState(): DemoState {
   return {
     profile: createDemoProfile(now),
     goal: createDemoGoal(now),
+    coachingSettings: createDemoCoachingSettings(now),
     contacts,
     opportunities: createDemoOpportunities(contacts),
     appointments: createDemoAppointments(contacts, now),
@@ -187,6 +191,48 @@ export function updateDemoGoal(patch: Partial<Pick<Goal, "monthlyRevenueGoalCent
   const state = getDemoState();
   state.goal = { ...state.goal, ...patch, updatedAt: new Date().toISOString() };
   return state.goal;
+}
+
+export type CoachingSettingsPatch = Partial<
+  Pick<
+    CoachingSettings,
+    | "timezone"
+    | "desiredFirstCallTime"
+    | "defaultBlockSize"
+    | "inactivityThresholdMinutes"
+    | "behindPaceTolerancePct"
+    | "notificationCooldownMinutes"
+    | "maxProactiveNotificationsPerDay"
+    | "coachingIntensity"
+  >
+>;
+
+export function updateDemoCoachingSettings(patch: CoachingSettingsPatch): CoachingSettings {
+  const state = getDemoState();
+  state.coachingSettings = { ...state.coachingSettings, ...patch, updatedAt: new Date().toISOString() };
+  return state.coachingSettings;
+}
+
+export function pauseDemoCoaching(until: Date | null): CoachingSettings {
+  const state = getDemoState();
+  state.coachingSettings = {
+    ...state.coachingSettings,
+    coachingPausedUntil: until ? until.toISOString() : null,
+    vacationMode: false,
+    updatedAt: new Date().toISOString(),
+  };
+  return state.coachingSettings;
+}
+
+export function setDemoVacationMode(enabled: boolean): CoachingSettings {
+  const state = getDemoState();
+  state.coachingSettings = {
+    ...state.coachingSettings,
+    vacationMode: enabled,
+    coachingPausedUntil: null,
+    updatedAt: new Date().toISOString(),
+  };
+  return state.coachingSettings;
 }
 
 export function callsCompletedOn(state: DemoState, day: Date): number {

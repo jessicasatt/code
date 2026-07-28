@@ -7,6 +7,7 @@ import { endCallBlock, logQuickCallResult, startCallBlock } from "@/lib/data/cal
 import { completeOnboarding, OnboardingInputSchema, type OnboardingInput } from "@/lib/data/onboarding";
 import { updateGoal, updateProfile, type GoalPatch, type ProfilePatch } from "@/lib/data/settings";
 import { setNotificationPreference } from "@/lib/data/notification-preferences";
+import { pauseCoaching, setVacationMode, updateCoachingSettings, type CoachingSettingsPatch } from "@/lib/data/coaching-settings";
 import { BEHAVIORAL_CHECKIN_REASONS, type AnsweredStatus, type BehavioralCheckinReason } from "@/lib/domain/types";
 import type { NotificationCategory } from "@/lib/domain/notifications";
 import { recordDemoBehavioralCheckin, resetDemoState } from "@/lib/demo/store";
@@ -25,6 +26,7 @@ const DELETABLE_TABLES = [
   "opportunities",
   "contacts",
   "highlevel_connections",
+  "coaching_settings",
   "goals",
   "profiles",
 ] as const;
@@ -97,6 +99,36 @@ export async function updateNotificationPreferenceAction(category: NotificationC
   const user = await requireUser();
   await setNotificationPreference(user.id, category, enabled);
   revalidatePath("/settings");
+}
+
+export async function updateCoachingSettingsAction(patch: CoachingSettingsPatch) {
+  const user = await requireUser();
+  await updateCoachingSettings(user.id, patch);
+  revalidatePath("/settings/coaching");
+}
+
+/** Quick pause options: 30 min / 1 hour / until tomorrow morning. Pass null to clear an active pause. */
+export async function pauseCoachingAction(minutesFromNow: number | "tomorrow" | null) {
+  const user = await requireUser();
+  let until: Date | null = null;
+  if (minutesFromNow === "tomorrow") {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(6, 0, 0, 0);
+    until = tomorrow;
+  } else if (typeof minutesFromNow === "number") {
+    until = new Date(Date.now() + minutesFromNow * 60_000);
+  }
+  await pauseCoaching(user.id, until);
+  revalidatePath("/settings/coaching");
+  revalidatePath("/execute");
+}
+
+export async function setVacationModeAction(enabled: boolean) {
+  const user = await requireUser();
+  await setVacationMode(user.id, enabled);
+  revalidatePath("/settings/coaching");
+  revalidatePath("/execute");
 }
 
 /** "Delete my data" (SPEC.md Settings). Removes every app-owned row for this user, then signs out. */

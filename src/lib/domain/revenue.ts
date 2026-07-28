@@ -1,3 +1,4 @@
+import { toZonedTime } from "date-fns-tz";
 import type { Cents } from "./money";
 import type { PaceStatus } from "./types";
 import { isWithinTimeRange, toAppTime, type TimeOfDayRange } from "../date/timezone";
@@ -59,6 +60,38 @@ export function calculateElapsedFractionOfCallingHours(now: Date, callingHours: 
   if (isWithinTimeRange(now, callingHours)) {
     const elapsed = nowMinutes - start;
     return Math.min(1, Math.max(0, elapsed / windowMinutes));
+  }
+
+  return nowMinutes < start ? 0 : 1;
+}
+
+/**
+ * Same as calculateElapsedFractionOfCallingHours, but parameterized by an
+ * explicit IANA timezone rather than the app-wide APP_TIMEZONE constant.
+ * Used by the behavioral state engine (src/lib/domain/behavioral-state.ts)
+ * so per-user timezone settings are honored correctly even before every
+ * other call site in the app has been migrated off the constant — see
+ * PROACTIVE_COACHING_AUDIT.md.
+ */
+export function calculateElapsedFractionOfCallingHoursInTimezone(
+  now: Date,
+  timezone: string,
+  callingHours: TimeOfDayRange,
+): number {
+  const toMinutes = (v: string) => {
+    const [h, m] = v.split(":").map(Number);
+    return h * 60 + m;
+  };
+  const start = toMinutes(callingHours.start);
+  const end = toMinutes(callingHours.end);
+  const windowMinutes = end > start ? end - start : 0;
+  if (windowMinutes <= 0) return 0;
+
+  const zoned = toZonedTime(now, timezone);
+  const nowMinutes = zoned.getHours() * 60 + zoned.getMinutes();
+
+  if (nowMinutes >= start && nowMinutes < end) {
+    return Math.min(1, Math.max(0, (nowMinutes - start) / windowMinutes));
   }
 
   return nowMinutes < start ? 0 : 1;

@@ -152,3 +152,27 @@ export interface BehavioralCheckin {
 }
 
 export type PaceStatus = "ahead" | "on_pace" | "behind";
+
+export type CoachingIntensity = "gentle" | "standard" | "direct";
+
+/**
+ * Additive settings for the proactive coaching layer (PROACTIVE_COACHING_AUDIT.md
+ * Phase 2). Deliberately separate from Profile/Goal: those own the revenue
+ * target and the base call schedule, this owns how proactive the coach is
+ * allowed to be and when it should back off entirely.
+ */
+export interface CoachingSettings {
+  userId: string;
+  timezone: string;
+  desiredFirstCallTime: string; // "HH:mm"
+  defaultBlockSize: number;
+  inactivityThresholdMinutes: number;
+  behindPaceTolerancePct: number;
+  notificationCooldownMinutes: number;
+  maxProactiveNotificationsPerDay: number;
+  coachingIntensity: CoachingIntensity;
+  coachingPausedUntil: string | null; // ISO instant
+  vacationMode: boolean;
+  createdAt: string;
+  updatedAt: string;
+}

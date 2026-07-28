@@ -12,17 +12,19 @@ import { buildNextAction, type NextAction } from "../domain/next-action";
 import { endOfAppDay, endOfAppWeek, remainingWorkdaysInWeek, startOfAppDay, startOfAppWeek } from "../date/timezone";
 import { isInactiveDuringActiveBlock, INACTIVITY_THRESHOLD_MINUTES } from "../domain/notifications";
 import {
+  DEFAULT_BLOCK_SIZING_CONFIG,
   determineSuggestedBlockMode,
   estimateBlockMinutes,
   suggestBlockSize,
   type PastBlockSummary,
   type SuggestedBlockMode,
 } from "../domain/block-sizing";
-import type { Goal, PaceStatus, Profile, WorkBlock } from "../domain/types";
+import type { CoachingSettings, Goal, PaceStatus, Profile, WorkBlock } from "../domain/types";
 import { isSupabaseConfigured } from "../env";
 import { callsCompletedOn, followUpsDueCount, getDemoState } from "../demo/store";
 import { createServerSupabaseClient } from "../supabase/server";
 import { mapGoalRow, mapProfileRow, mapWorkBlockRow } from "./mappers";
+import { getCoachingSettings } from "./coaching-settings";
 
 export interface HighLevelSyncStatus {
   connected: boolean;
@@ -68,8 +70,9 @@ function buildSnapshot(params: {
   activeWorkBlock: WorkBlock | null;
   lastBlockToday: PastBlockSummary | null;
   highLevelSync: HighLevelSyncStatus;
+  coachingSettings: CoachingSettings;
 }): ExecuteSnapshot {
-  const { now, profile, goal, callsToday, callsThisWeek, activeWorkBlock } = params;
+  const { now, profile, goal, callsToday, callsThisWeek, activeWorkBlock, coachingSettings } = params;
 
   const remainingMrrCents = calculateRemainingMrr(goal.monthlyRevenueGoalCents, goal.currentMrrCents);
   const clientsNeeded = calculateClientsNeeded(remainingMrrCents, goal.averageClientValueCents);
@@ -89,11 +92,15 @@ function buildSnapshot(params: {
     blockStatus: activeWorkBlock?.status ?? "scheduled",
     lastActivityAt: activeWorkBlock?.lastActivityAt ? new Date(activeWorkBlock.lastActivityAt) : null,
     now,
-    thresholdMinutes: INACTIVITY_THRESHOLD_MINUTES,
+    thresholdMinutes: coachingSettings.inactivityThresholdMinutes ?? INACTIVITY_THRESHOLD_MINUTES,
   });
 
   const suggestedBlockMode = determineSuggestedBlockMode(params.lastBlockToday);
-  const suggestedBlockSize = suggestBlockSize(suggestedBlockMode);
+  const suggestedBlockSize = suggestBlockSize(suggestedBlockMode, {
+    ...DEFAULT_BLOCK_SIZING_CONFIG,
+    normalBlockSize: coachingSettings.defaultBlockSize,
+    highMomentumBlockSize: coachingSettings.defaultBlockSize,
+  });
   const suggestedBlockMinutes = estimateBlockMinutes(suggestedBlockSize);
 
   const nextAction = buildNextAction({
@@ -134,7 +141,7 @@ function buildSnapshot(params: {
   };
 }
 
-function getExecuteSnapshotDemo(now: Date): ExecuteSnapshot {
+function getExecuteSnapshotDemo(now: Date, coachingSettings: CoachingSettings): ExecuteSnapshot {
   const state = getDemoState();
   const callsToday = callsCompletedOn(state, now);
   const weekStart = startOfAppWeek(now);
@@ -172,10 +179,11 @@ function getExecuteSnapshotDemo(now: Date): ExecuteSnapshot {
     activeWorkBlock,
     lastBlockToday,
     highLevelSync: { connected: false, lastSyncedAt: null, error: null },
+    coachingSettings,
   });
 }
 
-async function getExecuteSnapshotSupabase(userId: string, now: Date): Promise<ExecuteSnapshot> {
+async function getExecuteSnapshotSupabase(userId: string, now: Date, coachingSettings: CoachingSettings): Promise<ExecuteSnapshot> {
   const supabase = await createServerSupabaseClient();
 
   const [{ data: profileRow }, { data: goalRow }, { data: activeBlockRow }, { data: connectionRow }] = await Promise.all([
@@ -260,12 +268,14 @@ async function getExecuteSnapshotSupabase(userId: string, now: Date): Promise<Ex
       lastSyncedAt: connectionRow?.last_verified_at ?? null,
       error: connectionRow?.error ?? null,
     },
+    coachingSettings,
   });
 }
 
 export async function getExecuteSnapshot(userId: string, now: Date = new Date()): Promise<ExecuteSnapshot> {
+  const coachingSettings = await getCoachingSettings(userId);
   if (!isSupabaseConfigured()) {
-    return getExecuteSnapshotDemo(now);
+    return getExecuteSnapshotDemo(now, coachingSettings);
   }
-  return getExecuteSnapshotSupabase(userId, now);
+  return getExecuteSnapshotSupabase(userId, now, coachingSettings);
 }

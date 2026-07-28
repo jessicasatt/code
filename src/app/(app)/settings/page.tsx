@@ -25,6 +25,9 @@ export default async function SettingsPage() {
         hasPushSubscription={pushSubscriptionCount > 0}
         userEmail={user.email}
       />
+      <Link href="/settings/coaching" className="text-center text-sm font-medium text-accent">
+        Proactive coaching settings
+      </Link>
       <Link href="/settings/diagnostics" className="text-center text-sm font-medium text-accent">
         Connection diagnostics
       </Link>
