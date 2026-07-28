@@ -13,23 +13,12 @@ import { minutesBetween } from "@/lib/date/timezone";
 import { formatCentsAsUsd } from "@/lib/domain/money";
 import { DEFAULT_BLOCK_SIZING_CONFIG } from "@/lib/domain/block-sizing";
 import { BEHAVIORAL_CHECKIN_REASONS, type AnsweredStatus, type BehavioralCheckinReason } from "@/lib/domain/types";
+import { CHECKIN_REASON_LABELS } from "@/lib/labels/behavioral-checkin-reasons";
 import type { ExecuteSnapshot } from "@/lib/data/execute";
 import { createClient } from "@/lib/supabase/client";
 
 const HIGHLEVEL_APP_URL = "https://app.gohighlevel.com/";
 const SYNC_POLL_MS = 25_000;
-
-const REASON_LABELS: Record<BehavioralCheckinReason, string> = {
-  anxiety: "Anxiety",
-  rejection: "Rejection",
-  distracted: "Distracted",
-  low_energy: "Low energy",
-  other_work: "Other work",
-  technical_issue: "Technical issue",
-  bad_lead_list: "Bad lead list",
-  needed_a_break: "Needed a break",
-  completed_activity_elsewhere: "Completed activity elsewhere",
-};
 
 interface CompletedSummary {
   callsCompleted: number;
@@ -460,7 +449,7 @@ function InactiveState({
                 onClick={() => onCheckin(reason)}
                 className="rounded-full border border-background/40 px-3 py-2 text-sm"
               >
-                {REASON_LABELS[reason]}
+                {CHECKIN_REASON_LABELS[reason]}
               </button>
             ))}
           </div>

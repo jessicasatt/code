@@ -2,6 +2,9 @@ import "server-only";
 import { createAdminSupabaseClient } from "../supabase/admin";
 import { getHighLevelProvider } from "./index";
 import { isHighLevelConfigured } from "../env";
+import { markPendingCheckinResumed } from "../data/behavioral-metrics";
+import { notifyUser } from "../notifications/triggers";
+import { DEFAULT_BLOCK_SIZING_CONFIG } from "../domain/block-sizing";
 
 export interface SyncResult {
   ok: boolean;
@@ -83,6 +86,25 @@ export async function syncActiveWorkBlock(userId: string): Promise<SyncResult> {
       .from("work_blocks")
       .update({ calls_completed: callsCompleted, last_activity_at: lastActivityAt })
       .eq("id", block.id);
+
+    if (callsCompleted > block.calls_completed && lastActivityAt) {
+      await markPendingCheckinResumed(userId, new Date(lastActivityAt), true);
+
+      const remaining = block.call_target - callsCompleted;
+      if (remaining === 0) {
+        await notifyUser(userId, "block_target_completed", {
+          title: "Block complete",
+          body: "Block complete. Take a short break or begin the next block.",
+          deepLink: "/execute",
+        });
+      } else if (remaining === DEFAULT_BLOCK_SIZING_CONFIG.nearCompletionThreshold) {
+        await notifyUser(userId, "few_calls_remaining", {
+          title: `${remaining} calls left`,
+          body: `You are at ${callsCompleted} of ${block.call_target} calls. Complete the final ${remaining}.`,
+          deepLink: "/execute",
+        });
+      }
+    }
   }
 
   return {

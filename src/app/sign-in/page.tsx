@@ -25,7 +25,7 @@ export default function SignInPage() {
         ) : (
           <div className="flex flex-col gap-4 text-center">
             <p className="text-sm text-muted">
-              Supabase isn&apos;t connected yet, so Jessica OS is running in demo mode with fictional sales activity.
+              Jessica OS isn&apos;t fully set up yet, so it&apos;s running in demo mode with fictional sales activity.
             </p>
             <Link
               href="/execute"

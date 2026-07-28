@@ -306,6 +306,7 @@ export function SettingsForm({
             <div className="mt-2 flex flex-col gap-2">
               {ALL_NOTIFICATION_CATEGORIES.map((category) => {
                 const unavailable = CATEGORIES_REQUIRING_FREQUENT_SCHEDULING.includes(category);
+                const onlyWhileOpen = category === "inactivity";
                 return (
                   <div
                     key={category}
@@ -315,6 +316,9 @@ export function SettingsForm({
                       <span className="text-sm text-foreground">{CATEGORY_LABELS[category]}</span>
                       {unavailable ? (
                         <p className="text-xs text-muted">Needs more frequent scheduling than your current plan allows.</p>
+                      ) : null}
+                      {onlyWhileOpen ? (
+                        <p className="text-xs text-muted">Only while the Execute screen is open on this device.</p>
                       ) : null}
                     </div>
                     {unavailable ? (

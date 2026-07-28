@@ -4,6 +4,8 @@ import type { AnsweredStatus, WorkBlock } from "../domain/types";
 import { createServerSupabaseClient } from "../supabase/server";
 import { mapWorkBlockRow } from "./mappers";
 import { notifyUser } from "../notifications/triggers";
+import { markPendingCheckinResumed } from "./behavioral-metrics";
+import { DEFAULT_BLOCK_SIZING_CONFIG } from "../domain/block-sizing";
 
 export interface StartCallBlockInput {
   durationMinutes: number;
@@ -77,6 +79,7 @@ export async function logQuickCallResult(
 ): Promise<void> {
   if (!isSupabaseConfigured()) {
     logDemoCallResult(input);
+    await markPendingCheckinResumed(userId, new Date());
     return;
   }
 
@@ -100,6 +103,8 @@ export async function logQuickCallResult(
   });
   if (error) throw new Error(error.message);
 
+  await markPendingCheckinResumed(userId, new Date(now));
+
   if (activeBlock) {
     const callsCompleted = activeBlock.callsCompleted + 1;
     await supabase
@@ -112,13 +117,13 @@ export async function logQuickCallResult(
     if (remaining === 0) {
       await notifyUser(userId, "block_target_completed", {
         title: "Block complete",
-        body: `You hit your target of ${activeBlock.callTarget} calls.`,
+        body: "Block complete. Take a short break or begin the next block.",
         deepLink: "/execute",
       });
-    } else if (remaining === 3) {
+    } else if (remaining === DEFAULT_BLOCK_SIZING_CONFIG.nearCompletionThreshold) {
       await notifyUser(userId, "few_calls_remaining", {
-        title: "3 calls left",
-        body: `You're at ${callsCompleted} of ${activeBlock.callTarget} calls. Finish the last 3 before switching tasks.`,
+        title: `${remaining} calls left`,
+        body: `You are at ${callsCompleted} of ${activeBlock.callTarget} calls. Complete the final ${remaining}.`,
         deepLink: "/execute",
       });
     }

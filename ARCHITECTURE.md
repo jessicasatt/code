@@ -134,8 +134,16 @@ Two delivery paths, both gated by the same eligibility check
 enabled + outside quiet hours):
 
 - **Event-driven** (`src/lib/notifications/triggers.ts`, called directly
-  from `src/lib/data/call-blocks.ts`) — fires the instant a call block
-  hits its target or drops to 3 calls remaining. No schedule involved.
+  from `src/lib/data/call-blocks.ts` and `src/lib/highlevel/sync.ts`) —
+  fires the instant a call block hits its target or drops to the
+  near-completion threshold, using whichever path just recorded the call
+  (manual log or the real-time HighLevel sync). No schedule involved.
+- **Inactivity nudge** — checked on every on-demand HighLevel sync
+  (`POST /api/highlevel/sync-now`, called every ~25s while the Execute
+  screen is open) against that same request's freshly-synced
+  `last_activity_at`, gated by `canSendInactivityNudge`'s 45-minute
+  cooldown. This only runs while the Execute screen is open on a device —
+  it is not a background check.
 - **Scheduled** (`/api/cron/scheduled-notifications`) — an hourly sweep
   (24 `vercel.json` cron entries, one per hour, each individually
   Hobby-plan-compliant — see DEPLOYMENT.md) that checks every time-based
@@ -143,8 +151,8 @@ enabled + outside quiet hours):
   `notification_deliveries` dedup query, so it's safe to run hourly
   without spamming.
 
-Categories requiring true real-time checks (inactivity mid-block, block
-starting soon, no call logged yet) are listed in
+Categories that would need a true background check every few minutes
+(block starting soon, no call logged yet) are listed in
 `CATEGORIES_REQUIRING_FREQUENT_SCHEDULING` and shown as unavailable in
 Settings rather than silently not firing — building them without the
 infrastructure to actually check every few minutes would mean shipping
@@ -154,3 +162,41 @@ something that looks configured but never works.
 subscription a user has (usually one device, but not enforced), deletes
 subscriptions the push service reports as expired (410/404), and logs one
 `notification_deliveries` row per attempt regardless of outcome.
+
+## Execution coaching model
+
+The Execute screen (`src/app/(app)/execute`, `src/components/execute`) is
+the primary surface, and it is deliberately not a dashboard. Its job is to
+reduce activation energy and hand back exactly one next action — never the
+full remaining daily target as the first thing shown. **Never assign the
+entire mountain. Assign the next hill.**
+
+- **Real-time ingestion** (see `DATA_FLOW_AUDIT.md`): a client-triggered
+  on-demand sync (`POST /api/highlevel/sync-now`, `src/lib/highlevel/sync.ts`)
+  scoped to the active block's time window, called every ~25s while the
+  Execute screen is open, plus a Supabase Realtime subscription on
+  `work_blocks`/`call_events` for near-instant refresh. The daily
+  reconciliation cron still runs, but only for historical rollups and
+  catching anything the on-demand path missed — never as the primary path
+  for showing current-day activity.
+- **Adaptive block sizing** (`src/lib/domain/block-sizing.ts`): a small,
+  deterministic, configurable rule set (`BlockSizingConfig`) that decides
+  the next suggested block size from how the last block today ended —
+  normal size on a clean day, one call after a restart, a modest step up
+  after a successful restart, back to full size on continued momentum.
+  Configurable, not AI — there is no model in this path.
+- **Five states**, driven by `getExecuteSnapshot`
+  (`src/lib/data/execute.ts`) and rendered by `ExecuteView`: no active
+  block, active block, nearly complete (≤3 calls remaining), inactive
+  (past `INACTIVITY_THRESHOLD_MINUTES` with no call), and block complete.
+  Each state leads with one instruction; the full daily/weekly target is
+  always available further down the screen but never the first thing the
+  user sees during an active block.
+- **Behavioral metrics** (`src/lib/domain/behavioral-metrics.ts`): pure,
+  sample-size-carrying calculations over recorded facts only — activation
+  time, restart time, recovery rate, block completion rate, call rate
+  after a given outcome, interruption-reason counts, and intervention
+  effectiveness (resumption within 10/30/60 minutes of a check-in, see
+  `src/lib/data/behavioral-metrics.ts`). These describe what happened;
+  they never claim why, and a caller is expected to withhold a metric
+  until its sample size is meaningful.

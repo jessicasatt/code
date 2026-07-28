@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { getSettings } from "@/lib/data/settings";
 import { getNotificationPreferences, getPushSubscriptionCount } from "@/lib/data/notification-preferences";
@@ -24,6 +25,9 @@ export default async function SettingsPage() {
         hasPushSubscription={pushSubscriptionCount > 0}
         userEmail={user.email}
       />
+      <Link href="/settings/diagnostics" className="text-center text-sm font-medium text-accent">
+        Connection diagnostics
+      </Link>
     </main>
   );
 }

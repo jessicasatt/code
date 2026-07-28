@@ -65,15 +65,23 @@ export type NotificationCategory = (typeof ALL_NOTIFICATION_CATEGORIES)[number];
 
 /**
  * These categories are inherently time-window-based independent of any
- * user action (e.g. "no activity for 25 minutes"), so they need a check
- * running every few minutes. Vercel's Hobby-plan cron can only fire a
- * given job once per day, so these can't be delivered reliably without a
- * paid plan or an external scheduler — see DEPLOYMENT.md.
+ * user action, so they need a check running every few minutes. Vercel's
+ * Hobby-plan cron can only fire a given job once per day, and there's no
+ * server-side scheduler filling the gap, so these can't be delivered
+ * reliably without a paid plan or an external scheduler — see
+ * DEPLOYMENT.md.
+ *
+ * "inactivity" used to be in this list too, but it's no longer purely
+ * schedule-driven: the Execute screen's on-demand HighLevel sync
+ * (POST /api/highlevel/sync-now, called every ~25s while that screen is
+ * open) checks for inactivity on every sync and fires the nudge itself —
+ * see src/lib/notifications/triggers.ts. That only covers "while the
+ * Execute screen is open," not a true background check, which is why it's
+ * flagged differently in Settings rather than fully unavailable.
  */
 export const CATEGORIES_REQUIRING_FREQUENT_SCHEDULING: readonly NotificationCategory[] = [
   "block_starting_soon",
   "no_calls_logged_yet",
-  "inactivity",
 ];
 
 /** A notification is eligible only if its category is enabled and quiet hours (unless it's the one exempt category) don't block it. */

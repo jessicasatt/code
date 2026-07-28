@@ -78,6 +78,21 @@ test("ending an incomplete block prompts a behavioral check-in", async ({ page }
   await expect(page.getByText("Block complete")).toBeVisible();
 });
 
+test("an active block with no recent activity shows the restart prompt and interruption check-in", async ({
+  page,
+  request,
+}) => {
+  await request.post("/api/test/reset-demo?inactiveBlock=true");
+  await page.goto("/execute");
+
+  await expect(page.getByText("Let's restart with one call.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Make one call" })).toBeVisible();
+  await expect(page.getByText("What interrupted the block?")).toBeVisible();
+
+  await page.getByRole("button", { name: "Distracted" }).click();
+  await expect(page.getByText("Thanks — logged.")).toBeVisible();
+});
+
 test("settings changes to call targets persist across reload", async ({ page }) => {
   await page.goto("/settings");
 
