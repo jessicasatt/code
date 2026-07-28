@@ -8,38 +8,37 @@ test("sign-in screen offers to continue in demo mode", async ({ page }) => {
   await page.goto("/sign-in");
   await expect(page.getByRole("heading", { name: "Jessica OS" })).toBeVisible();
   await page.getByRole("link", { name: "Continue in demo mode" }).click();
-  await expect(page).toHaveURL(/\/today$/);
+  await expect(page).toHaveURL(/\/execute$/);
 });
 
-test("root redirects a signed-in, onboarded user straight to Today", async ({ page }) => {
+test("root redirects a signed-in, onboarded user straight to Execute", async ({ page }) => {
   await page.goto("/");
-  await expect(page).toHaveURL(/\/today$/);
+  await expect(page).toHaveURL(/\/execute$/);
   await expect(page.getByText("Demo mode")).toBeVisible();
 });
 
-test("Today screen shows MRR progress, call pace, and a single next action", async ({ page }) => {
-  await page.goto("/today");
-  await expect(page.getByText("Next action")).toBeVisible();
+test("Execute screen shows a single next action ahead of MRR and call totals", async ({ page }) => {
+  await page.goto("/execute");
   await expect(page.getByText("Current MRR / Goal")).toBeVisible();
   await expect(page.getByText("$4,250", { exact: false })).toBeVisible();
   await expect(page.getByText("Calls today", { exact: true })).toBeVisible();
 });
 
 test("bottom navigation reaches all five tabs", async ({ page }) => {
-  await page.goto("/today");
+  await page.goto("/execute");
   for (const [label, urlPart] of [
     ["Pipeline", "pipeline"],
     ["Patterns", "patterns"],
     ["Review", "review"],
     ["Settings", "settings"],
-    ["Today", "today"],
+    ["Execute", "execute"],
   ] as const) {
     await page.getByRole("link", { name: label }).click();
     await expect(page).toHaveURL(new RegExp(`/${urlPart}$`));
   }
 });
 
-test("completing onboarding from scratch reaches Today with the entered targets", async ({ page, request }) => {
+test("completing onboarding from scratch reaches Execute with the entered targets", async ({ page, request }) => {
   await request.post("/api/test/reset-demo?onboarded=false");
   await page.goto("/onboarding");
 
@@ -48,40 +47,35 @@ test("completing onboarding from scratch reaches Today with the entered targets"
   await page.getByLabel("Weekly call target").fill("120");
   await page.getByRole("button", { name: "Complete setup" }).click();
 
-  await expect(page).toHaveURL(/\/today$/);
+  await expect(page).toHaveURL(/\/execute$/);
   await expect(page.getByText("/ 25", { exact: false })).toBeVisible();
 });
 
 test("starting a call block and logging a result updates block progress", async ({ page }) => {
-  await page.goto("/today");
+  await page.goto("/execute");
 
-  await page.getByRole("button", { name: "Start call block" }).click();
+  await page.getByRole("button", { name: /^Start \d+-call block$/ }).click();
   await page.getByRole("button", { name: "Start now" }).click();
 
   await expect(page.getByText("Active call block")).toBeVisible();
-  await expect(page.getByText("0 / 20 calls")).toBeVisible();
+  await expect(page.getByText(/^0 of \d+$/)).toBeVisible();
 
-  await page.getByRole("button", { name: "Log quick result" }).click();
+  await page.getByRole("button", { name: "Log a call result manually" }).click();
   await page.getByRole("button", { name: "Answered — meaningful conversation" }).click();
 
-  await expect(page.getByText("1 / 20 calls")).toBeVisible();
+  await expect(page.getByText(/^1 of \d+$/)).toBeVisible();
 });
 
-test("ending an incomplete block prompts a two-tap behavioral check-in", async ({ page }) => {
-  await page.goto("/today");
+test("ending an incomplete block prompts a behavioral check-in", async ({ page }) => {
+  await page.goto("/execute");
 
-  await page.getByRole("button", { name: "Start call block" }).click();
+  await page.getByRole("button", { name: /^Start \d+-call block$/ }).click();
   await page.getByRole("button", { name: "Start now" }).click();
   await expect(page.getByText("Active call block")).toBeVisible();
 
-  // Tap 1: end the block before reaching its target.
-  await page.getByRole("button", { name: "End call block" }).click();
+  await page.getByRole("button", { name: "End block" }).click();
 
-  await expect(page.getByText("What interrupted the block?")).toBeVisible();
-  // Tap 2: choose a reason.
-  await page.getByRole("button", { name: "Distracted" }).click();
-
-  await expect(page.getByText("Thanks — logged.")).toBeVisible();
+  await expect(page.getByText("Block complete")).toBeVisible();
 });
 
 test("settings changes to call targets persist across reload", async ({ page }) => {

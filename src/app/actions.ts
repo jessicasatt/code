@@ -33,7 +33,7 @@ export async function completeOnboardingAction(input: OnboardingInput) {
   const user = await requireUser();
   const parsed = OnboardingInputSchema.parse(input);
   await completeOnboarding(user.id, parsed);
-  revalidatePath("/today");
+  revalidatePath("/execute");
   // Deliberately does not call redirect() here: this action is invoked
   // directly from a client component wrapped in try/catch (to surface
   // validation errors in the form), and redirect()'s internal throw would
@@ -43,19 +43,19 @@ export async function completeOnboardingAction(input: OnboardingInput) {
 export async function startCallBlockAction(input: { durationMinutes: number; callTarget: number }) {
   const user = await requireUser();
   await startCallBlock(user.id, input);
-  revalidatePath("/today");
+  revalidatePath("/execute");
 }
 
 export async function endCallBlockAction(blockId: string) {
   const user = await requireUser();
   await endCallBlock(user.id, blockId);
-  revalidatePath("/today");
+  revalidatePath("/execute");
 }
 
 export async function logQuickResultAction(input: { answeredStatus: AnsweredStatus; meaningfulConversation: boolean }) {
   const user = await requireUser();
   await logQuickCallResult(user.id, input);
-  revalidatePath("/today");
+  revalidatePath("/execute");
 }
 
 export async function recordCheckinAction(input: { reason: BehavioralCheckinReason; note: string | null; trigger: string }) {
@@ -76,21 +76,21 @@ export async function recordCheckinAction(input: { reason: BehavioralCheckinReas
     });
     if (error) throw new Error(error.message);
   }
-  revalidatePath("/today");
+  revalidatePath("/execute");
 }
 
 export async function updateGoalAction(patch: GoalPatch) {
   const user = await requireUser();
   await updateGoal(user.id, patch);
   revalidatePath("/settings");
-  revalidatePath("/today");
+  revalidatePath("/execute");
 }
 
 export async function updateProfileAction(patch: ProfilePatch) {
   const user = await requireUser();
   await updateProfile(user.id, patch);
   revalidatePath("/settings");
-  revalidatePath("/today");
+  revalidatePath("/execute");
 }
 
 export async function updateNotificationPreferenceAction(category: NotificationCategory, enabled: boolean) {

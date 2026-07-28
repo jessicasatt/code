@@ -14,7 +14,7 @@ export async function POST() {
   const result = await sendPushToUser(user.id, {
     title: "Jessica OS",
     body: "Test notification — if you can see this, push is working.",
-    deepLink: "/today",
+    deepLink: "/execute",
     category: "morning_brief",
   });
 

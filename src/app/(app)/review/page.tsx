@@ -1,10 +1,10 @@
 import { requireUser } from "@/lib/auth";
-import { getTodaySnapshot } from "@/lib/data/today";
+import { getExecuteSnapshot } from "@/lib/data/execute";
 import { formatCentsAsUsd } from "@/lib/domain/money";
 
 export default async function ReviewPage() {
   const user = await requireUser();
-  const snapshot = await getTodaySnapshot(user.id);
+  const snapshot = await getExecuteSnapshot(user.id);
   const targetCompletionPct = snapshot.dailyCallTarget
     ? Math.round((snapshot.callsToday / snapshot.dailyCallTarget) * 100)
     : 0;
@@ -35,8 +35,8 @@ export default async function ReviewPage() {
 
       <section className="rounded-2xl border border-dashed border-border p-5 text-center">
         <p className="text-sm text-muted">
-          Longest inactivity gap, weekly review, and daily metrics history land in Milestone 4 once daily_metrics
-          rollups are wired to real HighLevel activity.
+          Longest inactivity gap, weekly review, and restart-behavior history will appear here as more call blocks
+          are completed.
         </p>
       </section>
     </main>

@@ -11,7 +11,7 @@ export default async function OnboardingPage() {
   const user = await requireUser();
   const alreadyOnboarded = await isOnboardingComplete(user.id);
   if (alreadyOnboarded) {
-    redirect("/today");
+    redirect("/execute");
   }
 
   return (

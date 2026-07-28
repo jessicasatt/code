@@ -11,5 +11,5 @@ export default async function RootPage() {
     redirect("/sign-in");
   }
   const onboarded = await isOnboardingComplete(user.id);
-  redirect(onboarded ? "/today" : "/onboarding");
+  redirect(onboarded ? "/execute" : "/onboarding");
 }

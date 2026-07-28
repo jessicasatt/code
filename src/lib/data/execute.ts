@@ -10,13 +10,27 @@ import {
 } from "../domain/revenue";
 import { buildNextAction, type NextAction } from "../domain/next-action";
 import { endOfAppDay, endOfAppWeek, remainingWorkdaysInWeek, startOfAppDay, startOfAppWeek } from "../date/timezone";
+import { isInactiveDuringActiveBlock, INACTIVITY_THRESHOLD_MINUTES } from "../domain/notifications";
+import {
+  determineSuggestedBlockMode,
+  estimateBlockMinutes,
+  suggestBlockSize,
+  type PastBlockSummary,
+  type SuggestedBlockMode,
+} from "../domain/block-sizing";
 import type { Goal, PaceStatus, Profile, WorkBlock } from "../domain/types";
 import { isSupabaseConfigured } from "../env";
 import { callsCompletedOn, followUpsDueCount, getDemoState } from "../demo/store";
 import { createServerSupabaseClient } from "../supabase/server";
 import { mapGoalRow, mapProfileRow, mapWorkBlockRow } from "./mappers";
 
-export interface TodaySnapshot {
+export interface HighLevelSyncStatus {
+  connected: boolean;
+  lastSyncedAt: string | null;
+  error: string | null;
+}
+
+export interface ExecuteSnapshot {
   profile: Profile;
   goal: Goal;
   remainingMrrCents: number;
@@ -32,8 +46,13 @@ export interface TodaySnapshot {
   appointmentsBooked: number;
   followUpsDue: number;
   activeWorkBlock: WorkBlock | null;
+  isInactive: boolean;
+  suggestedBlockMode: SuggestedBlockMode;
+  suggestedBlockSize: number;
+  suggestedBlockMinutes: number;
   paceStatus: PaceStatus;
   nextAction: NextAction;
+  highLevelSync: HighLevelSyncStatus;
 }
 
 function buildSnapshot(params: {
@@ -47,7 +66,9 @@ function buildSnapshot(params: {
   appointmentsBooked: number;
   followUpsDue: number;
   activeWorkBlock: WorkBlock | null;
-}): TodaySnapshot {
+  lastBlockToday: PastBlockSummary | null;
+  highLevelSync: HighLevelSyncStatus;
+}): ExecuteSnapshot {
   const { now, profile, goal, callsToday, callsThisWeek, activeWorkBlock } = params;
 
   const remainingMrrCents = calculateRemainingMrr(goal.monthlyRevenueGoalCents, goal.currentMrrCents);
@@ -63,6 +84,17 @@ function buildSnapshot(params: {
   const expectedByNow = calculateExpectedCallsByNow(goal.dailyCallTarget, elapsedFraction);
   const paceStatus = calculatePaceStatus(callsToday, expectedByNow);
   const callsRemainingToday = calculateCallsRemainingToday(goal.dailyCallTarget, callsToday);
+
+  const isInactive = isInactiveDuringActiveBlock({
+    blockStatus: activeWorkBlock?.status ?? "scheduled",
+    lastActivityAt: activeWorkBlock?.lastActivityAt ? new Date(activeWorkBlock.lastActivityAt) : null,
+    now,
+    thresholdMinutes: INACTIVITY_THRESHOLD_MINUTES,
+  });
+
+  const suggestedBlockMode = determineSuggestedBlockMode(params.lastBlockToday);
+  const suggestedBlockSize = suggestBlockSize(suggestedBlockMode);
+  const suggestedBlockMinutes = estimateBlockMinutes(suggestedBlockSize);
 
   const nextAction = buildNextAction({
     now,
@@ -92,12 +124,17 @@ function buildSnapshot(params: {
     appointmentsBooked: params.appointmentsBooked,
     followUpsDue: params.followUpsDue,
     activeWorkBlock,
+    isInactive,
+    suggestedBlockMode,
+    suggestedBlockSize,
+    suggestedBlockMinutes,
     paceStatus,
     nextAction,
+    highLevelSync: params.highLevelSync,
   };
 }
 
-function getTodaySnapshotDemo(now: Date): TodaySnapshot {
+function getExecuteSnapshotDemo(now: Date): ExecuteSnapshot {
   const state = getDemoState();
   const callsToday = callsCompletedOn(state, now);
   const weekStart = startOfAppWeek(now);
@@ -114,6 +151,14 @@ function getTodaySnapshotDemo(now: Date): TodaySnapshot {
     return t >= todayStart.getTime() && t <= todayEnd.getTime();
   });
 
+  const activeWorkBlock = state.workBlocks.find((b) => b.status === "active") ?? null;
+  const pastBlocksToday = state.workBlocks
+    .filter((b) => b.status !== "active" && new Date(b.createdAt).getTime() >= todayStart.getTime())
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  const lastBlockToday = pastBlocksToday[0]
+    ? { status: pastBlocksToday[0].status, callTarget: pastBlocksToday[0].callTarget, callsCompleted: pastBlocksToday[0].callsCompleted }
+    : null;
+
   return buildSnapshot({
     now,
     profile: state.profile,
@@ -124,21 +169,24 @@ function getTodaySnapshotDemo(now: Date): TodaySnapshot {
     meaningfulConversations: todaysCalls.filter((c) => c.meaningfulConversation).length,
     appointmentsBooked: state.appointments.length,
     followUpsDue: followUpsDueCount(state),
-    activeWorkBlock: state.workBlocks.find((b) => b.status === "active") ?? null,
+    activeWorkBlock,
+    lastBlockToday,
+    highLevelSync: { connected: false, lastSyncedAt: null, error: null },
   });
 }
 
-async function getTodaySnapshotSupabase(userId: string, now: Date): Promise<TodaySnapshot> {
+async function getExecuteSnapshotSupabase(userId: string, now: Date): Promise<ExecuteSnapshot> {
   const supabase = await createServerSupabaseClient();
 
-  const [{ data: profileRow }, { data: goalRow }, { data: activeBlockRow }] = await Promise.all([
+  const [{ data: profileRow }, { data: goalRow }, { data: activeBlockRow }, { data: connectionRow }] = await Promise.all([
     supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
     supabase.from("goals").select("*").eq("user_id", userId).maybeSingle(),
     supabase.from("work_blocks").select("*").eq("user_id", userId).eq("status", "active").maybeSingle(),
+    supabase.from("highlevel_connections").select("connected, last_verified_at, error").eq("user_id", userId).maybeSingle(),
   ]);
 
   if (!profileRow || !goalRow) {
-    throw new Error("Profile or goal not found. Onboarding must complete before the Today screen can render.");
+    throw new Error("Profile or goal not found. Onboarding must complete before the Execute screen can render.");
   }
 
   const profile = mapProfileRow(profileRow);
@@ -150,36 +198,50 @@ async function getTodaySnapshotSupabase(userId: string, now: Date): Promise<Toda
   const weekStart = startOfAppWeek(now).toISOString();
   const weekEnd = endOfAppWeek(now).toISOString();
 
-  const [{ count: callsToday }, { count: callsThisWeek }, { data: todaysCalls }, { count: appointmentsBooked }, { count: followUpsDue }] =
-    await Promise.all([
-      supabase
-        .from("call_events")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", userId)
-        .gte("start_time", todayStart)
-        .lte("start_time", todayEnd),
-      supabase
-        .from("call_events")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", userId)
-        .gte("start_time", weekStart)
-        .lte("start_time", weekEnd),
-      supabase
-        .from("call_events")
-        .select("answered_status, meaningful_conversation")
-        .eq("user_id", userId)
-        .gte("start_time", todayStart)
-        .lte("start_time", todayEnd),
-      supabase.from("appointments").select("id", { count: "exact", head: true }).eq("user_id", userId),
-      supabase
-        .from("follow_ups")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", userId)
-        .eq("status", "due"),
-    ]);
+  const [
+    { count: callsToday },
+    { count: callsThisWeek },
+    { data: todaysCalls },
+    { count: appointmentsBooked },
+    { count: followUpsDue },
+    { data: lastBlockRow },
+  ] = await Promise.all([
+    supabase
+      .from("call_events")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .gte("start_time", todayStart)
+      .lte("start_time", todayEnd),
+    supabase
+      .from("call_events")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .gte("start_time", weekStart)
+      .lte("start_time", weekEnd),
+    supabase
+      .from("call_events")
+      .select("answered_status, meaningful_conversation")
+      .eq("user_id", userId)
+      .gte("start_time", todayStart)
+      .lte("start_time", todayEnd),
+    supabase.from("appointments").select("id", { count: "exact", head: true }).eq("user_id", userId),
+    supabase.from("follow_ups").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("status", "due"),
+    supabase
+      .from("work_blocks")
+      .select("status, call_target, calls_completed")
+      .eq("user_id", userId)
+      .neq("status", "active")
+      .gte("created_at", todayStart)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   const humanAnswers = (todaysCalls ?? []).filter((c) => c.answered_status === "answered").length;
   const meaningfulConversations = (todaysCalls ?? []).filter((c) => c.meaningful_conversation).length;
+  const lastBlockToday: PastBlockSummary | null = lastBlockRow
+    ? { status: lastBlockRow.status, callTarget: lastBlockRow.call_target, callsCompleted: lastBlockRow.calls_completed }
+    : null;
 
   return buildSnapshot({
     now,
@@ -192,12 +254,18 @@ async function getTodaySnapshotSupabase(userId: string, now: Date): Promise<Toda
     appointmentsBooked: appointmentsBooked ?? 0,
     followUpsDue: followUpsDue ?? 0,
     activeWorkBlock,
+    lastBlockToday,
+    highLevelSync: {
+      connected: connectionRow?.connected ?? false,
+      lastSyncedAt: connectionRow?.last_verified_at ?? null,
+      error: connectionRow?.error ?? null,
+    },
   });
 }
 
-export async function getTodaySnapshot(userId: string, now: Date = new Date()): Promise<TodaySnapshot> {
+export async function getExecuteSnapshot(userId: string, now: Date = new Date()): Promise<ExecuteSnapshot> {
   if (!isSupabaseConfigured()) {
-    return getTodaySnapshotDemo(now);
+    return getExecuteSnapshotDemo(now);
   }
-  return getTodaySnapshotSupabase(userId, now);
+  return getExecuteSnapshotSupabase(userId, now);
 }

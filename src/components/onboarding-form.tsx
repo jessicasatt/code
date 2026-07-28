@@ -71,7 +71,7 @@ export function OnboardingForm({ highLevelConnected }: { highLevelConnected: boo
           callingHoursStart,
           callingHoursEnd,
         });
-        router.push("/today");
+        router.push("/execute");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong.");
       }

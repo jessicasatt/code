@@ -113,13 +113,13 @@ export async function logQuickCallResult(
       await notifyUser(userId, "block_target_completed", {
         title: "Block complete",
         body: `You hit your target of ${activeBlock.callTarget} calls.`,
-        deepLink: "/today",
+        deepLink: "/execute",
       });
     } else if (remaining === 3) {
       await notifyUser(userId, "few_calls_remaining", {
         title: "3 calls left",
         body: `You're at ${callsCompleted} of ${activeBlock.callTarget} calls. Finish the last 3 before switching tasks.`,
-        deepLink: "/today",
+        deepLink: "/execute",
       });
     }
   }

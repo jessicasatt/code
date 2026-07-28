@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
     todayStart,
     "Morning brief",
     `Today's target: ${goal.daily_call_target} calls. Let's go.`,
-    "/today",
+    "/execute",
   );
 
   // End-of-day summary.
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
     todayStart,
     "Behind weekly pace",
     `${weeklyRemaining} calls remaining this week — that's ${requiredDailyPace}/day to stay on pace.`,
-    "/today",
+    "/execute",
   );
 
   // Follow-ups due — once-daily digest alongside the end-of-day summary.
@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
     todayStart,
     "Follow-ups due",
     `${followUpsDue} follow-up${followUpsDue === 1 ? "" : "s"} due.`,
-    "/today",
+    "/execute",
   );
 
   // Weekly review — Sunday evening, once per week.

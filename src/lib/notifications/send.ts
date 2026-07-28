@@ -40,7 +40,7 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
     try {
       await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-        JSON.stringify({ title: payload.title, body: payload.body, deepLink: payload.deepLink ?? "/today" }),
+        JSON.stringify({ title: payload.title, body: payload.body, deepLink: payload.deepLink ?? "/execute" }),
       );
       sent += 1;
     } catch (error) {

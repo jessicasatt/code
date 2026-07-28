@@ -1,9 +1,9 @@
 import { requireUser } from "@/lib/auth";
-import { getTodaySnapshot } from "@/lib/data/today";
+import { getExecuteSnapshot } from "@/lib/data/execute";
 
 export default async function PatternsPage() {
   const user = await requireUser();
-  const snapshot = await getTodaySnapshot(user.id);
+  const snapshot = await getExecuteSnapshot(user.id);
 
   return (
     <main className="mx-auto flex max-w-lg flex-col gap-6 px-5 py-6">
@@ -24,8 +24,7 @@ export default async function PatternsPage() {
 
       <section className="rounded-2xl border border-dashed border-border p-5 text-center">
         <p className="text-sm text-muted">
-          Deeper patterns (best call windows, niche performance, check-in trends) unlock once daily metrics and
-          behavioral check-in history build up — see Milestone 4 in IMPLEMENTATION_PLAN.md.
+          We are collecting activity and check-in data. Patterns will appear after several completed call blocks.
         </p>
       </section>
     </main>

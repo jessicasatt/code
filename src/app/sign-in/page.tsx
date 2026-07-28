@@ -28,7 +28,7 @@ export default function SignInPage() {
               Supabase isn&apos;t connected yet, so Jessica OS is running in demo mode with fictional sales activity.
             </p>
             <Link
-              href="/today"
+              href="/execute"
               className="rounded-xl bg-foreground px-4 py-3 text-base font-medium text-background"
             >
               Continue in demo mode

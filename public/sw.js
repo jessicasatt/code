@@ -44,14 +44,14 @@ self.addEventListener("push", (event) => {
       body: payload.body ?? "",
       icon: "/icons/icon-192.png",
       badge: "/icons/icon-192.png",
-      data: { deepLink: payload.deepLink ?? "/today" },
+      data: { deepLink: payload.deepLink ?? "/execute" },
     }),
   );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const deepLink = event.notification.data?.deepLink ?? "/today";
+  const deepLink = event.notification.data?.deepLink ?? "/execute";
   event.waitUntil(
     self.clients.matchAll({ type: "window" }).then((clients) => {
       for (const client of clients) {
