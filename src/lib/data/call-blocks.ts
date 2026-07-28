@@ -3,6 +3,7 @@ import { endDemoWorkBlock, getActiveDemoWorkBlock, logDemoCallResult, startDemoW
 import type { AnsweredStatus, WorkBlock } from "../domain/types";
 import { createServerSupabaseClient } from "../supabase/server";
 import { mapWorkBlockRow } from "./mappers";
+import { notifyUser } from "../notifications/triggers";
 
 export interface StartCallBlockInput {
   durationMinutes: number;
@@ -100,10 +101,26 @@ export async function logQuickCallResult(
   if (error) throw new Error(error.message);
 
   if (activeBlock) {
+    const callsCompleted = activeBlock.callsCompleted + 1;
     await supabase
       .from("work_blocks")
-      .update({ calls_completed: activeBlock.callsCompleted + 1, last_activity_at: now })
+      .update({ calls_completed: callsCompleted, last_activity_at: now })
       .eq("id", activeBlock.id)
       .eq("user_id", userId);
+
+    const remaining = activeBlock.callTarget - callsCompleted;
+    if (remaining === 0) {
+      await notifyUser(userId, "block_target_completed", {
+        title: "Block complete",
+        body: `You hit your target of ${activeBlock.callTarget} calls.`,
+        deepLink: "/today",
+      });
+    } else if (remaining === 3) {
+      await notifyUser(userId, "few_calls_remaining", {
+        title: "3 calls left",
+        body: `You're at ${callsCompleted} of ${activeBlock.callTarget} calls. Finish the last 3 before switching tasks.`,
+        deepLink: "/today",
+      });
+    }
   }
 }

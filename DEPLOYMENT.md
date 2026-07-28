@@ -52,11 +52,30 @@ it as the `Authorization: Bearer` header for cron-triggered requests — no
 extra wiring needed once the env var is set). No separate infrastructure
 required.
 
-Live today: `/api/cron/reconcile-highlevel` runs once a day, pulling recent
-HighLevel call activity. Vercel's **Hobby plan caps native cron at once per
-day** — cron expressions requesting anything more frequent fail at deploy
-time. More jobs (morning brief, inactivity checks, end-of-day summary,
-weekly review) are added the same way in Milestone 3.
+Live today:
+
+- `/api/cron/reconcile-highlevel` — once a day, pulls recent HighLevel call
+  activity.
+- `/api/cron/scheduled-notifications` — **24 separate cron entries**, one
+  per UTC hour, all pointing at the same endpoint. Vercel's Hobby plan caps
+  native cron at once per day *per job* — a single `"0 * * * *"` (hourly)
+  entry fails at deploy time. Twenty-four once-daily entries at different
+  hours is the workaround: each individually obeys the once/day rule, and
+  together they give hourly granularity, which is what lets a user's
+  arbitrary configured time (e.g. "morning brief at 7:30") actually get
+  honored instead of being pinned to one fixed global hour. The route
+  itself checks "is it currently this user's configured hour?" and "was
+  this already sent today/this week?" on every invocation, so firing 24
+  times a day is safe and idempotent, not spammy. (Vercel lifted per-project
+  cron job *count* limits to 100 in Jan 2026, so 24 extra entries costs
+  nothing beyond this.)
+
+Notification categories that are inherently time-window-based independent
+of any user action ("no activity for 25 minutes," "block starts in 10
+minutes," "no call logged in the first 10 minutes") need a check running
+every few minutes, not hourly — those aren't wired up (disabled in Settings
+with an explanation) until either the plan changes or an external
+scheduler is pointed at a new endpoint for them.
 
 If more-than-daily HighLevel reconciliation is wanted before upgrading off
 Hobby, trigger the same endpoint from a free external scheduler (e.g.

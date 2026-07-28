@@ -6,13 +6,17 @@ import { requireUser } from "@/lib/auth";
 import { endCallBlock, logQuickCallResult, startCallBlock } from "@/lib/data/call-blocks";
 import { completeOnboarding, OnboardingInputSchema, type OnboardingInput } from "@/lib/data/onboarding";
 import { updateGoal, updateProfile, type GoalPatch, type ProfilePatch } from "@/lib/data/settings";
+import { setNotificationPreference } from "@/lib/data/notification-preferences";
 import { BEHAVIORAL_CHECKIN_REASONS, type AnsweredStatus, type BehavioralCheckinReason } from "@/lib/domain/types";
+import type { NotificationCategory } from "@/lib/domain/notifications";
 import { recordDemoBehavioralCheckin, resetDemoState } from "@/lib/demo/store";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const DELETABLE_TABLES = [
   "notification_deliveries",
+  "notification_preferences",
+  "push_subscriptions",
   "behavioral_checkins",
   "call_events",
   "work_blocks",
@@ -87,6 +91,12 @@ export async function updateProfileAction(patch: ProfilePatch) {
   await updateProfile(user.id, patch);
   revalidatePath("/settings");
   revalidatePath("/today");
+}
+
+export async function updateNotificationPreferenceAction(category: NotificationCategory, enabled: boolean) {
+  const user = await requireUser();
+  await setNotificationPreference(user.id, category, enabled);
+  revalidatePath("/settings");
 }
 
 /** "Delete my data" (SPEC.md Settings). Removes every app-owned row for this user, then signs out. */

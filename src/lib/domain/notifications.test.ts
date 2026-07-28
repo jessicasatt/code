@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canSendInactivityNudge, isInactiveDuringActiveBlock, isNotificationEligible } from "./notifications";
+import { canSendInactivityNudge, isCurrentHourMatch, isInactiveDuringActiveBlock, isNotificationEligible } from "./notifications";
 import { fromAppTime } from "../date/timezone";
 
 describe("isInactiveDuringActiveBlock", () => {
@@ -93,5 +93,19 @@ describe("isNotificationEligible", () => {
         quietHours: { start: "20:00", end: "07:00" },
       }),
     ).toBe(true);
+  });
+});
+
+describe("isCurrentHourMatch", () => {
+  it("matches when the app-timezone hour equals the configured hour, ignoring minutes", () => {
+    const now = fromAppTime(new Date(2026, 0, 15, 7, 42));
+    expect(isCurrentHourMatch(now, "07:30")).toBe(true);
+    expect(isCurrentHourMatch(now, "07:00")).toBe(true);
+  });
+
+  it("does not match a different hour", () => {
+    const now = fromAppTime(new Date(2026, 0, 15, 7, 42));
+    expect(isCurrentHourMatch(now, "08:00")).toBe(false);
+    expect(isCurrentHourMatch(now, "18:00")).toBe(false);
   });
 });

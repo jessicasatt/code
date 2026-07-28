@@ -26,6 +26,7 @@ import type {
   WorkBlock,
   WorkBlockStatus,
 } from "../domain/types";
+import { ALL_NOTIFICATION_CATEGORIES, type NotificationCategory } from "../domain/notifications";
 
 export interface DemoState {
   profile: Profile;
@@ -37,7 +38,13 @@ export interface DemoState {
   workBlocks: WorkBlock[];
   behavioralCheckins: BehavioralCheckin[];
   followUps: FollowUp[];
+  notificationPreferences: Record<NotificationCategory, boolean>;
+  pushSubscriptionCount: number;
   onboarded: boolean;
+}
+
+function createDefaultNotificationPreferences(): Record<NotificationCategory, boolean> {
+  return Object.fromEntries(ALL_NOTIFICATION_CATEGORIES.map((c) => [c, true])) as Record<NotificationCategory, boolean>;
 }
 
 function createSeedState(): DemoState {
@@ -53,6 +60,8 @@ function createSeedState(): DemoState {
     workBlocks: createDemoWorkBlocks(),
     behavioralCheckins: [],
     followUps: createDemoFollowUps(contacts, now),
+    notificationPreferences: createDefaultNotificationPreferences(),
+    pushSubscriptionCount: 0,
     onboarded: true,
   };
 }
@@ -186,4 +195,9 @@ export function callsCompletedOn(state: DemoState, day: Date): number {
 
 export function followUpsDueCount(state: DemoState): number {
   return state.followUps.filter((f) => f.status === "due").length;
+}
+
+export function setDemoNotificationPreference(category: NotificationCategory, enabled: boolean): void {
+  const state = getDemoState();
+  state.notificationPreferences[category] = enabled;
 }

@@ -126,3 +126,31 @@ provide installability, standalone display, an offline fallback
 (`/offline`), and the Web Push `push`/`notificationclick` handlers used
 once VAPID is configured. Safe-area insets are applied via `.safe-top` /
 `.safe-bottom` / `.safe-x` utility classes in `globals.css`.
+
+## Notifications
+
+Two delivery paths, both gated by the same eligibility check
+(`isNotificationEligible` in `src/lib/domain/notifications.ts`: category
+enabled + outside quiet hours):
+
+- **Event-driven** (`src/lib/notifications/triggers.ts`, called directly
+  from `src/lib/data/call-blocks.ts`) — fires the instant a call block
+  hits its target or drops to 3 calls remaining. No schedule involved.
+- **Scheduled** (`/api/cron/scheduled-notifications`) — an hourly sweep
+  (24 `vercel.json` cron entries, one per hour, each individually
+  Hobby-plan-compliant — see DEPLOYMENT.md) that checks every time-based
+  category against the user's configured times and a
+  `notification_deliveries` dedup query, so it's safe to run hourly
+  without spamming.
+
+Categories requiring true real-time checks (inactivity mid-block, block
+starting soon, no call logged yet) are listed in
+`CATEGORIES_REQUIRING_FREQUENT_SCHEDULING` and shown as unavailable in
+Settings rather than silently not firing — building them without the
+infrastructure to actually check every few minutes would mean shipping
+something that looks configured but never works.
+
+`src/lib/notifications/send.ts` wraps `web-push`, sends to every
+subscription a user has (usually one device, but not enforced), deletes
+subscriptions the push service reports as expired (410/404), and logs one
+`notification_deliveries` row per attempt regardless of outcome.

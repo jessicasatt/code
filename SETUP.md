@@ -50,13 +50,22 @@ data.
 
 ## Phase 3 — Turn on notifications
 
-1. Once push notifications are wired up (Milestone 3), open Jessica OS on
-   your iPhone and tap "Enable" under Notifications in onboarding or
-   Settings.
-2. Approve the permission prompt iOS shows you.
+1. Open Jessica OS on your iPhone (must be added to your home screen first
+   — Safari alone can't show push notifications on iOS).
+2. Go to **Settings** in the app and tap **"Enable notifications on this
+   device."**
+3. Approve the permission prompt iOS shows you.
+4. Tap **"Send test notification"** to confirm it actually arrives.
+5. Turn individual notification categories on/off below that as you like.
 
 No account or key is needed from you for this step — the notification
-keypair is generated once during setup.
+keypair was generated once during setup and lives only on the server.
+
+Note: a few notification types ("call block starts in 10 min," "no
+activity for 25 min mid-block") need checks running every few minutes,
+which isn't available on the free hosting tier — those show as
+"Unavailable" in Settings rather than silently not working. Ask if you
+want to upgrade hosting or add an external scheduler to unlock them.
 
 ## Phase 4 — Deploy for real, permanent use
 

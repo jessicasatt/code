@@ -6,6 +6,7 @@ import { completeOnboardingAction } from "@/app/actions";
 import { WEEKDAYS } from "@/lib/domain/onboarding-input";
 import type { Weekday } from "@/lib/domain/types";
 import { useNotificationPermission } from "@/lib/use-notification-permission";
+import { subscribeToPush } from "@/lib/push-client";
 
 const WEEKDAY_LABELS: Record<Weekday, string> = {
   sunday: "Sun",
@@ -46,6 +47,10 @@ export function OnboardingForm({ highLevelConnected }: { highLevelConnected: boo
     if (!("Notification" in window)) return;
     const permission = await Notification.requestPermission();
     setPermissionOverride(permission);
+    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    if (permission === "granted" && vapidPublicKey) {
+      await subscribeToPush(vapidPublicKey).catch((err) => console.error("Push subscription failed", err));
+    }
   }
 
   function handleSubmit(e: React.FormEvent) {

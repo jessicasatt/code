@@ -1,10 +1,19 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { deleteMyDataAction, signOutAction, updateGoalAction, updateProfileAction } from "@/app/actions";
+import {
+  deleteMyDataAction,
+  signOutAction,
+  updateGoalAction,
+  updateNotificationPreferenceAction,
+  updateProfileAction,
+} from "@/app/actions";
 import { WEEKDAYS } from "@/lib/domain/onboarding-input";
 import { centsToDollars, dollarsToCents } from "@/lib/domain/money";
 import type { Goal, Profile, Weekday } from "@/lib/domain/types";
+import { ALL_NOTIFICATION_CATEGORIES, CATEGORIES_REQUIRING_FREQUENT_SCHEDULING, type NotificationCategory } from "@/lib/domain/notifications";
+import { subscribeToPush, unsubscribeFromPush } from "@/lib/push-client";
+import { useNotificationPermission } from "@/lib/use-notification-permission";
 
 const WEEKDAY_LABELS: Record<Weekday, string> = {
   sunday: "Sun",
@@ -16,23 +25,34 @@ const WEEKDAY_LABELS: Record<Weekday, string> = {
   saturday: "Sat",
 };
 
-const NOTIFICATION_CATEGORIES = [
-  "Morning brief",
-  "Call block reminders",
-  "Inactivity nudges",
-  "Follow-up due",
-  "Weekly review",
-];
+const CATEGORY_LABELS: Record<NotificationCategory, string> = {
+  morning_brief: "Morning brief",
+  block_starting_soon: "Call block starting in 10 min",
+  no_calls_logged_yet: "No call logged 10 min into a block",
+  few_calls_remaining: "3 calls left in a block",
+  inactivity: "No activity for 25 min mid-block",
+  block_target_completed: "Call block target completed",
+  follow_up_due: "Follow-up due",
+  behind_weekly_pace: "Behind weekly pace",
+  end_of_day_summary: "End-of-day summary",
+  weekly_review: "Weekly review",
+};
 
 export function SettingsForm({
   profile,
   goal,
   highLevelConnected,
+  pushConfigured,
+  hasPushSubscription,
+  notificationPreferences,
   userEmail,
 }: {
   profile: Profile;
   goal: Goal;
   highLevelConnected: boolean;
+  pushConfigured: boolean;
+  hasPushSubscription: boolean;
+  notificationPreferences: Record<NotificationCategory, boolean>;
   userEmail: string | null;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -50,6 +70,12 @@ export function SettingsForm({
   const [quietHoursEnd, setQuietHoursEnd] = useState(profile.quietHoursEnd);
   const [morningBriefTime, setMorningBriefTime] = useState(profile.morningBriefTime);
   const [endOfDaySummaryTime, setEndOfDaySummaryTime] = useState(profile.endOfDaySummaryTime);
+
+  const notificationPermission = useNotificationPermission();
+  const [subscribed, setSubscribed] = useState(hasPushSubscription);
+  const [preferences, setPreferences] = useState(notificationPreferences);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushMessage, setPushMessage] = useState<string | null>(null);
 
   function toggleWorkday(day: Weekday) {
     setWorkdays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
@@ -86,6 +112,58 @@ export function SettingsForm({
     if (!window.confirm("This permanently deletes all your Jessica OS data. Continue?")) return;
     startTransition(async () => {
       await deleteMyDataAction();
+    });
+  }
+
+  async function handleEnablePush() {
+    setPushBusy(true);
+    setPushMessage(null);
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setPushMessage("Notification permission was not granted.");
+        return;
+      }
+      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!vapidPublicKey) {
+        setPushMessage("Push isn't configured on the server yet.");
+        return;
+      }
+      const ok = await subscribeToPush(vapidPublicKey);
+      setSubscribed(ok);
+      if (!ok) setPushMessage("Couldn't complete the subscription. Try again.");
+    } finally {
+      setPushBusy(false);
+    }
+  }
+
+  async function handleDisablePush() {
+    setPushBusy(true);
+    try {
+      await unsubscribeFromPush();
+      setSubscribed(false);
+    } finally {
+      setPushBusy(false);
+    }
+  }
+
+  async function handleTestPush() {
+    setPushBusy(true);
+    setPushMessage(null);
+    try {
+      const response = await fetch("/api/push/test", { method: "POST" });
+      const body = await response.json().catch(() => ({}));
+      setPushMessage(response.ok ? "Test notification sent." : (body.error ?? "Failed to send test notification."));
+    } finally {
+      setPushBusy(false);
+    }
+  }
+
+  function toggleCategory(category: NotificationCategory) {
+    const next = !preferences[category];
+    setPreferences((prev) => ({ ...prev, [category]: next }));
+    startTransition(async () => {
+      await updateNotificationPreferenceAction(category, next);
     });
   }
 
@@ -188,18 +266,78 @@ export function SettingsForm({
 
       {savedAt ? <p className="text-sm text-success">Saved at {savedAt}</p> : null}
 
-      <Section title="Notification categories">
-        <p className="text-sm text-muted">
-          Available once push notifications are connected. See ARCHITECTURE.md for the Milestone 3 plan.
-        </p>
-        <div className="flex flex-col gap-2">
-          {NOTIFICATION_CATEGORIES.map((category) => (
-            <div key={category} className="flex items-center justify-between rounded-xl border border-border p-3 opacity-60">
-              <span className="text-sm text-foreground">{category}</span>
-              <span className="text-xs text-muted">Coming soon</span>
+      <Section title="Notifications">
+        {!pushConfigured ? (
+          <p className="text-sm text-muted">Push notifications aren&apos;t configured on the server yet.</p>
+        ) : notificationPermission === "unsupported" ? (
+          <p className="text-sm text-muted">This browser doesn&apos;t support push notifications.</p>
+        ) : !subscribed ? (
+          <button
+            disabled={pushBusy}
+            onClick={handleEnablePush}
+            className="rounded-xl bg-foreground px-4 py-3 text-sm font-medium text-background disabled:opacity-60"
+          >
+            {pushBusy ? "Enabling…" : "Enable notifications on this device"}
+          </button>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between rounded-xl border border-border p-3">
+              <span className="text-sm text-foreground">This device</span>
+              <span className="text-sm font-medium text-success">Enabled</span>
             </div>
-          ))}
-        </div>
+            <div className="flex gap-2">
+              <button
+                disabled={pushBusy}
+                onClick={handleTestPush}
+                className="flex-1 rounded-xl border border-border px-4 py-3 text-sm font-medium text-foreground disabled:opacity-60"
+              >
+                Send test notification
+              </button>
+              <button
+                disabled={pushBusy}
+                onClick={handleDisablePush}
+                className="flex-1 rounded-xl border border-border px-4 py-3 text-sm font-medium text-foreground disabled:opacity-60"
+              >
+                Disable
+              </button>
+            </div>
+            {pushMessage ? <p className="text-sm text-muted">{pushMessage}</p> : null}
+
+            <div className="mt-2 flex flex-col gap-2">
+              {ALL_NOTIFICATION_CATEGORIES.map((category) => {
+                const unavailable = CATEGORIES_REQUIRING_FREQUENT_SCHEDULING.includes(category);
+                return (
+                  <div
+                    key={category}
+                    className={`flex items-center justify-between rounded-xl border border-border p-3 ${unavailable ? "opacity-60" : ""}`}
+                  >
+                    <div>
+                      <span className="text-sm text-foreground">{CATEGORY_LABELS[category]}</span>
+                      {unavailable ? (
+                        <p className="text-xs text-muted">Needs more frequent scheduling than your current plan allows.</p>
+                      ) : null}
+                    </div>
+                    {unavailable ? (
+                      <span className="text-xs text-muted">Unavailable</span>
+                    ) : (
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={preferences[category]}
+                        onClick={() => toggleCategory(category)}
+                        className={`h-6 w-11 shrink-0 rounded-full transition-colors ${preferences[category] ? "bg-accent" : "bg-border"}`}
+                      >
+                        <span
+                          className={`block h-5 w-5 translate-x-0.5 rounded-full bg-surface transition-transform ${preferences[category] ? "translate-x-5" : ""}`}
+                        />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </Section>
 
       <Section title="HighLevel connection">
