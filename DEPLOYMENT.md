@@ -46,11 +46,21 @@ or immediately after a deploy that depends on schema changes.
 
 ## Scheduled jobs
 
-Once Milestone 3 lands, recurring jobs (morning brief, inactivity checks,
-end-of-day summary, weekly review, reconciliation) run via Vercel Cron
-(`vercel.json` `crons` entries calling authenticated API routes, gated by
-`CRON_SECRET`). Vercel Cron requires no separate infrastructure — it's part
-of the Vercel project.
+`vercel.json` defines Vercel Cron entries calling authenticated API routes,
+gated by the `CRON_SECRET` environment variable (Vercel automatically sends
+it as the `Authorization: Bearer` header for cron-triggered requests — no
+extra wiring needed once the env var is set). No separate infrastructure
+required.
+
+Live today: `/api/cron/reconcile-highlevel` runs once a day, pulling recent
+HighLevel call activity. Vercel's **Hobby plan caps native cron at once per
+day** — cron expressions requesting anything more frequent fail at deploy
+time. More jobs (morning brief, inactivity checks, end-of-day summary,
+weekly review) are added the same way in Milestone 3.
+
+If more-than-daily HighLevel reconciliation is wanted before upgrading off
+Hobby, trigger the same endpoint from a free external scheduler (e.g.
+cron-job.org) instead — it's just an authenticated `GET` request.
 
 ## Rolling back
 
